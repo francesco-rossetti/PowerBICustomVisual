@@ -1,0 +1,67 @@
+{
+    "dataRoles": [
+        {
+            "displayName": "Coordinates Data",
+            "name": "coordinatesData",
+            "kind": "Grouping"
+        },
+        {
+            "displayName": "Value",
+            "name": "value",
+            "kind": "Measure"
+        }
+    ],
+    "dataViewMappings": [
+        {
+            "table": {
+                "rows": {
+                    "select": [
+                        {
+                            "max": 2,
+                            "for": {
+                                "in": "coordinatesData"
+                            }
+                        },
+                        {
+                            "for": {
+                                "in": "value"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "objects": {
+        "table": {
+            "displayName": "Table",
+            "properties": {
+               "tableColor": {
+                    "displayName": "Color",
+                    "description": "The fill color of the table.",
+                    "type": {
+                        "fill": {
+                            "solid": {
+                                "color": true
+                            }
+                        }
+                    }
+                },
+                "tableThickness": {
+                    "displayName": "Thickness",
+                    "description": "The table thickness.",
+                    "type": {
+                        "numeric": true
+                    }
+                },
+                "cellFontSize": {
+                    "displayName": "Cell Font Size",
+                    "description": "The Cell Font Size.",
+                    "type": {
+                        "numeric": true
+                    }
+                }
+            }
+        }
+    }
+}
