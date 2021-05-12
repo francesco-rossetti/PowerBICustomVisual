@@ -1,7 +1,8 @@
 "use strict";
 
-import "core-js/stable";
 import powerbi from "powerbi-visuals-api";
+import "regenerator-runtime/runtime";
+import {createTooltipServiceWrapper, ITooltipServiceWrapper} from "powerbi-visuals-utils-tooltiputils";
 
 import "./../style/visual.less";
 
@@ -12,7 +13,8 @@ import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInst
 import VisualObjectInstance = powerbi.VisualObjectInstance;
 import DataView = powerbi.DataView;
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject;
-import IVisualHost = powerbi.extensibility.IVisualHost;
+import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
+import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 
 import * as d3 from "d3";
 type Selection<T extends d3.BaseType> = d3.Selection<T, any, any, any>;
@@ -22,6 +24,7 @@ import { VisualSettings } from "./settings";
 export class Visual implements IVisual {
     private host: IVisualHost;
     private settings: VisualSettings;
+    private tooltipServiceWrapper: ITooltipServiceWrapper;
 
     private container: Selection<HTMLElement>;
     private table: Selection<HTMLElement>;
@@ -33,6 +36,8 @@ export class Visual implements IVisual {
                         .style('height', '100%');
                         
         this.table = this.container.append("table");
+
+        this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService, options.element);
     }
 
     public update(options: VisualUpdateOptions) {
@@ -75,6 +80,11 @@ export class Visual implements IVisual {
                                     .style('text-align', 'center')
                                     .style('font-size', graphicalSettings.cellFontSize + 'px')
                                     .text(this.searchElementValue(data, x, y));
+                    
+                    /*this.tooltipServiceWrapper.addTooltip(barSelectionMerged,
+                        (datapoint: BarChartDataPoint) => this.getTooltipData(datapoint),
+                        (datapoint: BarChartDataPoint) => datapoint.selectionId
+                    );*/
                 }else if(y == 0) {
                     tableColsContent.append('td')
                                     .style('text-align', 'right')
@@ -90,6 +100,15 @@ export class Visual implements IVisual {
             }
         }
     }
+
+    /*private getTooltipData(value: any): VisualTooltipDataItem[] {
+        return [{
+            displayName: value.category,
+            value: value.value.toString(),
+            color: value.color,
+            header: language && "displayed language " + language
+        }];
+    }*/
 
     searchElementValue(data: any[], x: number, y: number): any {
         const result = data.filter(element => element[0] == x && element[1] == y);

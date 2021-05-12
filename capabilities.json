@@ -32,6 +32,15 @@
             }
         }
     ],
+    "tooltips": {
+        "supportedTypes": {
+            "default": true,
+            "canvas": true
+        },
+        "roles": [
+            "Tooltips"
+        ]
+    },
     "objects": {
         "table": {
             "displayName": "Table",
