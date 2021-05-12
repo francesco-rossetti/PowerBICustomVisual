@@ -19,12 +19,15 @@ import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 import * as d3 from "d3";
 type Selection<T extends d3.BaseType> = d3.Selection<T, any, any, any>;
 
+import { TableDataPoint } from './models/datapoint.model'
 import { VisualSettings } from "./settings";
 
 export class Visual implements IVisual {
     private host: IVisualHost;
     private settings: VisualSettings;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
+
+    private tableDataPoints: TableDataPoint[];
 
     private container: Selection<HTMLElement>;
     private table: Selection<HTMLElement>;
@@ -53,9 +56,21 @@ export class Visual implements IVisual {
 
             this.generateReactMatrix(dataView);
 
-            this.tooltipServiceWrapper.addTooltip(this.table.selectAll(),
-                (tooltipEvent: TooltipEventArgs<number>) => this.getTooltipData(tooltipEvent.data),
-                (tooltipEvent: TooltipEventArgs<number>) => null
+            let barSelection = this.container
+                                .selectAll('.tableDataCell');
+
+            console.log(barSelection);
+
+            barSelection = this.container.selectAll('.tableDataCell')
+                                        .data(this.tableDataPoints);
+
+            const barSelectionMerged = barSelection
+                                        .enter()
+                                        .append('rect')
+                                        .merge(<any>barSelection);
+                                            
+            this.tooltipServiceWrapper.addTooltip(barSelectionMerged,
+                (tooltipEvent: TableDataPoint) => this.getTooltipData(tooltipEvent)
             );
         }
     }
@@ -70,6 +85,7 @@ export class Visual implements IVisual {
         const colsNumber = this.getMax(data, 1) + 1;
         
         this.table.html("");
+        this.tableDataPoints = [];
 
         for (let x = 0; x < rowsNumber; x++) {
             let tableColsContent: Selection<HTMLElement> = this.table.append('tr');
@@ -81,11 +97,22 @@ export class Visual implements IVisual {
                 }
 
                 if(y != 0 && x != 0) {
+                    const value = this.searchElementValue(data, x, y);
+                    
                     tableColsContent.append('td')
+                                    .classed('tableDataCell', true)
                                     .style('border', graphicalSettings.tableThickness + 'px solid')
-                                    .style('text-align', 'center')
                                     .style('font-size', graphicalSettings.cellFontSize + 'px')
-                                    .text(this.searchElementValue(data, x, y));
+                                    .text(value);
+                    
+                    const model: TableDataPoint = {
+                        xCoordinate: x,
+                        yCoordinate: y,
+                        value: value,
+                        selectionId: null
+                    };
+
+                    this.tableDataPoints.push(model);
                 }else if(y == 0) {
                     tableColsContent.append('td')
                                     .style('text-align', 'right')
@@ -102,12 +129,14 @@ export class Visual implements IVisual {
         }
     }
 
-    private getTooltipData(value: any): VisualTooltipDataItem[] {
+    private getTooltipData(value: TableDataPoint): VisualTooltipDataItem[] {
+        console.log(value);
+
         return [{
-            displayName: value.category,
-            value: value.value.toString(),
-            color: value.color,
-            header: "Titolo"
+            header: "Cella: " + value.xCoordinate + ", " + value.yCoordinate,
+            displayName: "Valore: ",
+            value: value.value,
+            color: ""
         }];
     }
 
