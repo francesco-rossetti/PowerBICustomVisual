@@ -1,10 +1,8 @@
 "use strict";
 
-import powerbi from "powerbi-visuals-api";
 import "regenerator-runtime/runtime";
+import powerbi from "powerbi-visuals-api";
 import {createTooltipServiceWrapper, ITooltipServiceWrapper, TooltipEventArgs} from "powerbi-visuals-utils-tooltiputils";
-
-import "./../style/visual.less";
 
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
@@ -14,26 +12,33 @@ import VisualObjectInstance = powerbi.VisualObjectInstance;
 import DataView = powerbi.DataView;
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject;
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
+import ISelectionId = powerbi.visuals.ISelectionId;
+import PrimitiveValue = powerbi.PrimitiveValue;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 
 import * as d3 from "d3";
 type Selection<T extends d3.BaseType> = d3.Selection<T, any, any, any>;
 
-import { TableDataPoint } from './models/datapoint.model'
+import { TableDataPoint } from './models/datapoint.model';
 import { VisualSettings } from "./settings";
+
+import "./../style/visual.less";
 
 export class Visual implements IVisual {
     private host: IVisualHost;
     private settings: VisualSettings;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
 
+    private dataViewTableRowItems: TableDataPoint[];
     private tableDataPoints: TableDataPoint[];
 
     private container: Selection<HTMLElement>;
     private table: Selection<HTMLElement>;
 
+    /// Method used to initialize the custom visual
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
+        this.host.createSelectionManager();
         this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService, options.element);
 
         this.container = d3.select(options.element)
@@ -44,45 +49,75 @@ export class Visual implements IVisual {
         this.table = this.container.append("table");
     }
 
-    public update(options: VisualUpdateOptions) {
+    /// Method used to parse the raw data from the user to a more complex structured data
+    private parseDataViewItems(dataToParse: DataView): void {
+        dataToParse.table.rows.forEach((row: powerbi.DataViewTableRow, rowIndex: number) => {
+            const tableValues: any[] = [];
+            
+            for (let valueIndex = 2; valueIndex < row.length; valueIndex++) {
+                tableValues.push(row[valueIndex]);
+            }
+
+            const selection: ISelectionId = this.host.createSelectionIdBuilder()
+                                                .withTable(dataToParse.table, rowIndex)
+                                                .createSelectionId();
+
+            const parsedItem: TableDataPoint = {
+                xCoordinate: row[0],
+                yCoordinate: row[1],
+                values: tableValues,
+                selectionId: selection
+            }
+
+            this.dataViewTableRowItems.push(parsedItem);   
+        });
+    }
+
+    /// Method used to listen to every update of the visual
+    public update(options: VisualUpdateOptions): void {
         if(options.dataViews 
             && options.dataViews[0]
             && options.dataViews[0].table
             && options.dataViews[0].table.rows){
             const dataView: DataView = options.dataViews[0];
+            this.settings = Visual.parseSettings(dataView);
+
+            this.dataViewTableRowItems = [];
+            this.parseDataViewItems(dataView);
 
             this.table.style('height', '100%')
                     .style('width', '100%');
 
-            this.generateReactMatrix(dataView);
+            this.generateReactMatrix();
 
             let barSelection = this.container
                                 .selectAll('.tableDataCell');
 
-            console.log(barSelection);
-
-            barSelection = this.container.selectAll('.tableDataCell')
+            barSelection = this.container.selectAll('.emptyTableDataCell')
                                         .data(this.tableDataPoints);
 
-            const barSelectionMerged = barSelection
-                                        .enter()
+            const barSelectionMerged = barSelection.enter()
                                         .append('rect')
                                         .merge(<any>barSelection);
                                             
             this.tooltipServiceWrapper.addTooltip(barSelectionMerged,
-                (tooltipEvent: TableDataPoint) => this.getTooltipData(tooltipEvent)
+                (tooltipData: TableDataPoint) => this.getTooltipData(tooltipData),
+                (tooltipData: TableDataPoint) => tooltipData.selectionId
             );
+        } else {
+            this.clean();
         }
     }
 
-    generateReactMatrix(dataView: DataView): void {
-        const data = dataView.table.rows;
-
-        this.settings = Visual.parseSettings(dataView);
+    /// Method used to render the matrix and to give the container extra CSS properties
+    generateReactMatrix(): void {
         const graphicalSettings = this.settings.table;
 
-        const rowsNumber = this.getMax(data, 0) + 1;
-        const colsNumber = this.getMax(data, 1) + 1;
+        this.container.style('background-color', graphicalSettings.tableColor);
+
+        const rowsNumber = <number>(this.getMaxRows()) + 1;
+        
+        const colsNumber = <number>(this.getMaxCols()) + 1;
         
         this.table.html("");
         this.tableDataPoints = [];
@@ -97,23 +132,26 @@ export class Visual implements IVisual {
                 }
 
                 if(y != 0 && x != 0) {
-                    const value = this.searchElementValue(data, x, y);
+                    const value = this.searchElementValue(x, y);
                     
-                    tableColsContent.append('td')
-                                    .classed('tableDataCell', true)
+                    let cell = tableColsContent.append('td')
                                     .style('border', graphicalSettings.tableThickness + 'px solid')
-                                    .style('font-size', graphicalSettings.cellFontSize + 'px')
-                                    .text(value);
-                    
-                    const model: TableDataPoint = {
-                        xCoordinate: x,
-                        yCoordinate: y,
-                        value: value,
-                        selectionId: null
-                    };
+                                    .style('font-size', graphicalSettings.cellFontSize + 'px');
 
-                    this.tableDataPoints.push(model);
-                }else if(y == 0) {
+                    if(value != null) {
+                        cell.text(value.values.join());
+                        cell.classed('emptyTableDataCell', true);                        
+
+                        const model: TableDataPoint = {
+                            xCoordinate: x,
+                            yCoordinate: y,
+                            values: value.values,
+                            selectionId: value.selectionId
+                        };
+
+                        this.tableDataPoints.push(model);
+                    }
+                } else if(y == 0) {
                     tableColsContent.append('td')
                                     .style('text-align', 'right')
                                     .style('font-size', graphicalSettings.cellFontSize + 'px')
@@ -129,43 +167,67 @@ export class Visual implements IVisual {
         }
     }
 
+    /// Method to convert and provide data for the default tooltip
     private getTooltipData(value: TableDataPoint): VisualTooltipDataItem[] {
         console.log(value);
 
         return [{
             header: "Cella: " + value.xCoordinate + ", " + value.yCoordinate,
             displayName: "Valore: ",
-            value: value.value,
-            color: ""
+            value: value.values.join()
         }];
     }
 
-    searchElementValue(data: any[], x: number, y: number): any {
-        const result = data.filter(element => element[0] == x && element[1] == y);
+    /// Method to search the values into the provided array with the provided (x,y) position
+    searchElementValue(x: number, y: number): TableDataPoint {
+        const result = this.dataViewTableRowItems.filter(element => element.xCoordinate == x && element.yCoordinate == y);
 
         if(result && result[0]) {
-            return result[0][2];
+            return result[0];
         }
 
-        return [];
+        return null;
     }
 
-    getMax(array: any[], indexInnerElement: number): number {
-        let max = 0;
+    /// Get max row values from the provided array
+    getMaxRows(): PrimitiveValue {
+        let max: PrimitiveValue = 0;
 
-        for (let index = 0; index < array.length; index++) {
-            if(array[index][indexInnerElement] > max) {
-                max = array[index][indexInnerElement];
+        for (let index = 0; index < this.dataViewTableRowItems.length; index++) {
+            if(this.dataViewTableRowItems[index].xCoordinate > max) {
+                max = this.dataViewTableRowItems[index].xCoordinate;
             }
         }
 
         return max;
     }
 
+    /// Get max column values from the provided array
+    getMaxCols(): PrimitiveValue {
+        let max: PrimitiveValue = 0;
+
+        for (let index = 0; index < this.dataViewTableRowItems.length; index++) {
+            if(this.dataViewTableRowItems[index].yCoordinate > max) {
+                max = this.dataViewTableRowItems[index].yCoordinate;
+            }
+        }
+
+        return max;
+    }
+
+    /// Method used to reset the view to its default settings
+    private clean() {
+        this.table.html("");
+        this.tableDataPoints = [];
+        this.dataViewTableRowItems = [];
+    }
+
+    /// Settings Parsing Method
     private static parseSettings(dataView: DataView): VisualSettings {
         return <VisualSettings>VisualSettings.parse(dataView);
     }
 
+    /// Method to react to the settings' changes
     public enumerateObjectInstances(
         options: EnumerateVisualObjectInstancesOptions
     ): VisualObjectInstance[] | VisualObjectInstanceEnumerationObject {

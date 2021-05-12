@@ -1,10 +1,11 @@
 import powerbi from "powerbi-visuals-api";
 
+import PrimitiveValue = powerbi.PrimitiveValue;
 import ISelectionId = powerbi.visuals.ISelectionId;
 
 export interface TableDataPoint {
-    xCoordinate: number,
-    yCoordinate: number,
-    value: any,
+    xCoordinate: PrimitiveValue,
+    yCoordinate: PrimitiveValue,
+    values: any[],
     selectionId: ISelectionId;
 }
