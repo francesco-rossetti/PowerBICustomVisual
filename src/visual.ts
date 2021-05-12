@@ -2,7 +2,7 @@
 
 import powerbi from "powerbi-visuals-api";
 import "regenerator-runtime/runtime";
-import {createTooltipServiceWrapper, ITooltipServiceWrapper} from "powerbi-visuals-utils-tooltiputils";
+import {createTooltipServiceWrapper, ITooltipServiceWrapper, TooltipEventArgs} from "powerbi-visuals-utils-tooltiputils";
 
 import "./../style/visual.less";
 
@@ -30,14 +30,15 @@ export class Visual implements IVisual {
     private table: Selection<HTMLElement>;
 
     constructor(options: VisualConstructorOptions) {
+        this.host = options.host;
+        this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService, options.element);
+
         this.container = d3.select(options.element)
                         .append('div')
                         .style('width', '100%')
                         .style('height', '100%');
                         
         this.table = this.container.append("table");
-
-        this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService, options.element);
     }
 
     public update(options: VisualUpdateOptions) {
@@ -51,6 +52,11 @@ export class Visual implements IVisual {
                     .style('width', '100%');
 
             this.generateReactMatrix(dataView);
+
+            this.tooltipServiceWrapper.addTooltip(this.table.selectAll(),
+                (tooltipEvent: TooltipEventArgs<number>) => this.getTooltipData(tooltipEvent.data),
+                (tooltipEvent: TooltipEventArgs<number>) => null
+            );
         }
     }
 
@@ -80,11 +86,6 @@ export class Visual implements IVisual {
                                     .style('text-align', 'center')
                                     .style('font-size', graphicalSettings.cellFontSize + 'px')
                                     .text(this.searchElementValue(data, x, y));
-                    
-                    /*this.tooltipServiceWrapper.addTooltip(barSelectionMerged,
-                        (datapoint: BarChartDataPoint) => this.getTooltipData(datapoint),
-                        (datapoint: BarChartDataPoint) => datapoint.selectionId
-                    );*/
                 }else if(y == 0) {
                     tableColsContent.append('td')
                                     .style('text-align', 'right')
@@ -101,14 +102,14 @@ export class Visual implements IVisual {
         }
     }
 
-    /*private getTooltipData(value: any): VisualTooltipDataItem[] {
+    private getTooltipData(value: any): VisualTooltipDataItem[] {
         return [{
             displayName: value.category,
             value: value.value.toString(),
             color: value.color,
-            header: language && "displayed language " + language
+            header: "Titolo"
         }];
-    }*/
+    }
 
     searchElementValue(data: any[], x: number, y: number): any {
         const result = data.filter(element => element[0] == x && element[1] == y);
