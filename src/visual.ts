@@ -54,8 +54,6 @@ export class Visual implements IVisual {
     private parseDataViewItems(dataToParse: DataView, colorPalette: IColorPalette): void {
         dataToParse.table.rows.forEach((row: powerbi.DataViewTableRow, rowIndex: number) => {
             const tableValues: any[] = [];
-
-            console.log(row);
             
             for (let valueIndex = row.length == 3 ? 2 : 3; valueIndex < row.length; valueIndex++) {
                 tableValues.push(row[valueIndex]);
@@ -145,14 +143,29 @@ export class Visual implements IVisual {
                                     .style('font-size', graphicalSettings.cellFontSize + 'px');
 
                     if(value != null) {
-                        cell.text(value.values.join());
-                        cell.style('background-color', value.color);
-                        cell.classed('emptyTableDataCell', true);                        
+                        cell.classed('emptyTableDataCell', true);
+
+                        let container = cell.append("div")
+                                            .style('width', '100%')
+                                            .style("height", "100%");
+
+                        let indicator = container.append("div")
+                                            .style('width', '50%')
+                                            .style("float", "left")
+                                            .style("height", "100%")
+                                            .style('background-color', value.color);
+
+                        let data = container.append("div")
+                                        .style('margin-left', '50%')
+                                        .style("height", "100%")
+                                        .style('vertical-align', 'center')
+                                        .classed('centerDIV', true)
+                                        .text(value.values.join());
 
                         const model: TableDataPoint = {
                             xCoordinate: x,
                             yCoordinate: y,
-                            color: "#ffffff",
+                            color: value.color,
                             values: value.values,
                             selectionId: value.selectionId
                         };
