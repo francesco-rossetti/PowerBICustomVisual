@@ -7,6 +7,7 @@ import {createTooltipServiceWrapper, ITooltipServiceWrapper, TooltipEventArgs} f
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
 import IVisual = powerbi.extensibility.visual.IVisual;
+import IColorPalette = powerbi.extensibility.IColorPalette;
 import EnumerateVisualObjectInstancesOptions = powerbi.EnumerateVisualObjectInstancesOptions;
 import VisualObjectInstance = powerbi.VisualObjectInstance;
 import DataView = powerbi.DataView;
@@ -50,11 +51,13 @@ export class Visual implements IVisual {
     }
 
     /// Method used to parse the raw data from the user to a more complex structured data
-    private parseDataViewItems(dataToParse: DataView): void {
+    private parseDataViewItems(dataToParse: DataView, colorPalette: IColorPalette): void {
         dataToParse.table.rows.forEach((row: powerbi.DataViewTableRow, rowIndex: number) => {
             const tableValues: any[] = [];
+
+            console.log(row);
             
-            for (let valueIndex = 2; valueIndex < row.length; valueIndex++) {
+            for (let valueIndex = row.length == 3 ? 2 : 3; valueIndex < row.length; valueIndex++) {
                 tableValues.push(row[valueIndex]);
             }
 
@@ -66,6 +69,7 @@ export class Visual implements IVisual {
                 xCoordinate: row[0],
                 yCoordinate: row[1],
                 values: tableValues,
+                color: colorPalette.getColor(<string>row[2]).value,
                 selectionId: selection
             }
 
@@ -78,12 +82,14 @@ export class Visual implements IVisual {
         if(options.dataViews 
             && options.dataViews[0]
             && options.dataViews[0].table
-            && options.dataViews[0].table.rows){
+            && options.dataViews[0].table.rows) {
             const dataView: DataView = options.dataViews[0];
             this.settings = Visual.parseSettings(dataView);
 
+            let colorPalette: IColorPalette = this.host.colorPalette;
+        
             this.dataViewTableRowItems = [];
-            this.parseDataViewItems(dataView);
+            this.parseDataViewItems(dataView, colorPalette);
 
             this.table.style('height', '100%')
                     .style('width', '100%');
@@ -140,11 +146,13 @@ export class Visual implements IVisual {
 
                     if(value != null) {
                         cell.text(value.values.join());
+                        cell.style('background-color', value.color);
                         cell.classed('emptyTableDataCell', true);                        
 
                         const model: TableDataPoint = {
                             xCoordinate: x,
                             yCoordinate: y,
+                            color: "#ffffff",
                             values: value.values,
                             selectionId: value.selectionId
                         };

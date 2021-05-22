@@ -1,6 +1,11 @@
 {
     "dataRoles": [
         {
+            "displayName": "Category Data",
+            "name": "category",
+            "kind": "Grouping"
+        },
+        {
             "displayName": "Asse X",
             "name": "horizontalCoordinatesData",
             "kind": "Grouping"
@@ -31,6 +36,11 @@
                             "max": 1,
                             "for": {
                                 "in": "verticalCoordinatesData"
+                            }
+                        },
+                        {
+                            "for": {
+                                "in": "category"
                             }
                         },
                         {

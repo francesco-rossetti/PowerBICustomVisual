@@ -7,5 +7,6 @@ export interface TableDataPoint {
     xCoordinate: PrimitiveValue,
     yCoordinate: PrimitiveValue,
     values: any[],
+    color: string,
     selectionId: ISelectionId;
 }
