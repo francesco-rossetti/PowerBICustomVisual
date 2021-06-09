@@ -14,6 +14,8 @@ import DataView = powerbi.DataView;
 import VisualObjectInstanceEnumerationObject = powerbi.VisualObjectInstanceEnumerationObject;
 import VisualTooltipDataItem = powerbi.extensibility.VisualTooltipDataItem;
 import ISelectionId = powerbi.visuals.ISelectionId;
+import ISelectionManager = powerbi.extensibility.ISelectionManager;
+import ISelectionIdBuilder = powerbi.visuals.ISelectionIdBuilder;
 import PrimitiveValue = powerbi.PrimitiveValue;
 import IVisualHost = powerbi.extensibility.visual.IVisualHost;
 
@@ -30,6 +32,8 @@ export class Visual implements IVisual {
     private settings: VisualSettings;
     private tooltipServiceWrapper: ITooltipServiceWrapper;
 
+    private selectionManager: ISelectionManager;
+
     private dataViewTableRowItems: TableDataPoint[];
     private tableDataPoints: TableDataPoint[];
 
@@ -41,6 +45,8 @@ export class Visual implements IVisual {
         this.host = options.host;
         this.host.createSelectionManager();
         this.tooltipServiceWrapper = createTooltipServiceWrapper(this.host.tooltipService, options.element);
+
+        this.selectionManager = this.host.createSelectionManager();
 
         this.container = d3.select(options.element)
                         .append('div')
@@ -54,22 +60,36 @@ export class Visual implements IVisual {
     private parseDataViewItems(dataToParse: DataView, colorPalette: IColorPalette): void {
         dataToParse.table.rows.forEach((row: powerbi.DataViewTableRow, rowIndex: number) => {
             const tableValues: any[] = [];
-            
-            for (let valueIndex = row.length == 3 ? 2 : 3; valueIndex < row.length; valueIndex++) {
-                tableValues.push(row[valueIndex]);
+            let category: any = null;
+
+            if(row.length > 3) {
+                for (let valueIndex = 3; valueIndex < row.length; valueIndex++) {
+                    tableValues.push(row[valueIndex]);
+                }
+
+                category = row[2];
+            } else {
+                for (let valueIndex = 2; valueIndex < row.length; valueIndex++) {
+                    tableValues.push(row[valueIndex]);
+                }
+
+                category = null;
             }
 
             const selection: ISelectionId = this.host.createSelectionIdBuilder()
                                                 .withTable(dataToParse.table, rowIndex)
-                                                .createSelectionId();
+                                                .createSelectionId();           
 
             const parsedItem: TableDataPoint = {
                 xCoordinate: row[0],
                 yCoordinate: row[1],
                 values: tableValues,
-                color: colorPalette.getColor(<string>row[2]).value,
+                color: category ? colorPalette.getColor(<string>row[2]).value : null,
                 selectionId: selection
-            }
+            }          
+
+            console.log(row);
+            console.log(parsedItem);
 
             this.dataViewTableRowItems.push(parsedItem);   
         });
@@ -142,25 +162,47 @@ export class Visual implements IVisual {
                                     .style('border', graphicalSettings.tableThickness + 'px solid')
                                     .style('font-size', graphicalSettings.cellFontSize + 'px');
 
+                    cell.on("click", () => {
+                        this.selectionManager.select(value.selectionId);
+                    });
+
+                    cell.on("contextmenu", (event) => {
+                        this.selectionManager.showContextMenu(value.selectionId, {
+                            x: event.clientX,
+                            y: event.clientY
+                        });            
+
+                        event.preventDefault();
+                    });
+
                     if(value != null) {
                         cell.classed('emptyTableDataCell', true);
 
-                        let container = cell.append("div")
-                                            .style('width', '100%')
-                                            .style("height", "100%");
+                        if(value.color) {
+                            let container = cell.append("div")
+                                                .style('width', '100%')
+                                                .style("height", "100%");
 
-                        let indicator = container.append("div")
-                                            .style('width', '50%')
-                                            .style("float", "left")
-                                            .style("height", "100%")
-                                            .style('background-color', value.color);
+                            let indicator = container.append("div")
+                                                    .style('width', '50%')
+                                                    .style("float", "left")
+                                                    .style("height", "100%")
+                                                    .style('background-color', value.color);
 
-                        let data = container.append("div")
-                                        .style('margin-left', '50%')
-                                        .style("height", "100%")
-                                        .style('vertical-align', 'center')
-                                        .classed('centerDIV', true)
-                                        .text(value.values.join());
+                            let data = container.append("div")
+                                                .style('margin-left', '50%')
+                                                .style("height", "100%")
+                                                .style('vertical-align', 'center')
+                                                .classed('centerDIV', true)
+                                                .text(value.values.join());
+                        } else {
+                            cell.append("div")
+                                .style('width', '100%')
+                                .style("height", "100%")
+                                .style('vertical-align', 'center')
+                                .classed('centerDIV', true)
+                                .text(value.values.join());
+                        }
 
                         const model: TableDataPoint = {
                             xCoordinate: x,
@@ -190,8 +232,6 @@ export class Visual implements IVisual {
 
     /// Method to convert and provide data for the default tooltip
     private getTooltipData(value: TableDataPoint): VisualTooltipDataItem[] {
-        console.log(value);
-
         return [{
             header: "Cella: " + value.xCoordinate + ", " + value.yCoordinate,
             displayName: "Valore: ",
