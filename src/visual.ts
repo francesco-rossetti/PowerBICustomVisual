@@ -62,18 +62,12 @@ export class Visual implements IVisual {
             const tableValues: any[] = [];
             let category: any = null;
 
-            if(row.length > 3) {
-                for (let valueIndex = 3; valueIndex < row.length; valueIndex++) {
-                    tableValues.push(row[valueIndex]);
-                }
+            for (let valueIndex = row.length == 3 ? 2 : 3; valueIndex < row.length; valueIndex++) {
+                tableValues.push(row[valueIndex]);
 
-                category = row[2];
-            } else {
-                for (let valueIndex = 2; valueIndex < row.length; valueIndex++) {
-                    tableValues.push(row[valueIndex]);
+                if(row.length != 3) {
+                    category = row[2];
                 }
-
-                category = null;
             }
 
             const selection: ISelectionId = this.host.createSelectionIdBuilder()
